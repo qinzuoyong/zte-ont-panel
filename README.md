@@ -17,7 +17,7 @@
 ## 直接使用
 
 从 [GitHub Releases](https://github.com/qinzuoyong/zte-ont-panel/releases/latest) 下载
-`中兴光猫控制面板-v1.1.0.exe`，双击即可，无需安装运行库。
+`zte-ont-panel-v1.1.0.exe`，双击即可，无需安装运行库。
 
 > 仓库只放源码与文档，exe 作为发行版附件发布，不进入 git 历史。
 > 也可以按「重新编译」一节的步骤自行构建。
