@@ -1,0 +1,21 @@
+# Rust 构建产物
+rust源码/zte_g7615_panel_rs/target/
+/target/
+
+# 本机运行数据：连接设置、配置备份、运行日志
+数据/
+
+# 发行版二进制通过 GitHub Releases 分发，不进入 git 历史
+中兴光猫控制面板.exe
+*.exe
+
+# README 未引用的旧版对比截图
+docs/截图/改造前.png
+docs/截图/改造后*.png
+
+# 临时文件与系统文件
+*.part
+Thumbs.db
+.DS_Store
+*.swp
+*~

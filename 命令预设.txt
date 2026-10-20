@@ -1,0 +1,221 @@
+# 中兴光猫控制面板 —— 命令预设（通用清单）
+#
+# 注意：这是**通用**清单。程序连上设备识别出机型后，
+# 若存在 `命令预设_<机型>.txt`（如 命令预设_f650.txt），会优先加载它。
+# 通用清单主要用于「未识别机型」的情况，或你想自己定制时。
+#
+#
+# 这个文件可以直接用记事本编辑，改完重启程序生效，不需要重新编译。
+#
+# 格式说明：
+#   group <分组名>
+#     action <操作名>
+#       cmd <命令原文>
+#     action <操作名> | danger | <风险说明>
+#       cmd <命令原文>
+#
+#   - 第二段写 danger 表示危险操作，点击时会弹二次确认
+#   - 第三段是风险说明，会显示在确认条上（只有危险操作能带说明）
+#   - 一个 action 可以有多条 cmd，按顺序执行
+#   - # 开头的整行是注释
+#
+# 注意：
+#   - `sendcmd 1 DB set` 的写操作会自动做「写后回读校验」，
+#     字段名写错时界面会标 ❌ 并指出具体字段，不会静默骗你。
+#   - 字段名不确定的先用界面上的「表结构查询 → 读整表」查真实字段，
+#     不要照抄网上教程的字段名（各固件版本差异很大）。
+#   - 本文件解析失败时程序会报出具体行号，不会静默忽略。
+
+group 状态查看
+  action 设备信息
+    cmd sendcmd 1 DB p DevInfo
+  action PON/光功率
+    cmd sendcmd 1 DB p PONINFO
+  action WAN 拨号配置
+    cmd sendcmd 1 DB p WANC
+  action WiFi 配置
+    cmd sendcmd 1 DB p WLANCfg
+  action 在线/联网设备
+    cmd cat /proc/net/arp
+  action 运行时长/负载
+    cmd uptime
+  action 设备温度
+    cmd cat /proc/tempsensor
+  action CPU 占用
+    cmd cat /proc/cpuusage
+  action 硬件信息
+    cmd cat /proc/capability/boardinfo
+  action 固件版本
+    cmd upgradetest getver
+  action 系统时间
+    cmd date
+
+group 账号与 Telnet
+  action 查看账号密码表
+    cmd sendcmd 1 DB p DevAuthInfo
+    cmd sendcmd 1 DB p UserInfo
+  action 查看 Telnet 配置
+    cmd sendcmd 1 DB p TelnetCfg
+  action 固化 Telnet(root/Zte521) | danger | 会写入公开的弱口令 Zte521 并把关闭时间设为极大值（等于永久开启）。仅在自己的局域网内使用，用完建议改回强口令。
+    cmd sendcmd 1 DB set TelnetCfg 0 Lan_Enable 1
+    cmd sendcmd 1 DB set TelnetCfg 0 Lan_EnableAfterOlt 1
+    cmd sendcmd 1 DB set TelnetCfg 0 CloseServerTime 9999999
+    cmd sendcmd 1 DB set TelnetCfg 0 TS_UName root
+    cmd sendcmd 1 DB set TelnetCfg 0 TSLan_UName root
+    cmd sendcmd 1 DB set TelnetCfg 0 TS_UPwd Zte521
+    cmd sendcmd 1 DB set TelnetCfg 0 TSLan_UPwd Zte521
+    cmd sendcmd 1 DB save
+  action 补全 Telnet 加固字段 | danger | 补齐 Max_Con_Num / ExitTime / InitSecLvl 等字段，并关闭 WAN 侧 Telnet。关闭后如需从外网管理请改用其他方式。
+    cmd sendcmd 1 DB set TelnetCfg 0 TS_Enable 1
+    cmd sendcmd 1 DB set TelnetCfg 0 Wan_Enable 0
+    cmd sendcmd 1 DB set TelnetCfg 0 Max_Con_Num 99
+    cmd sendcmd 1 DB set TelnetCfg 0 ExitTime 999999
+    cmd sendcmd 1 DB set TelnetCfg 0 InitSecLvl 3
+    cmd sendcmd 1 DB save
+  action 重启 telnetd（固化立即生效） | danger | 让刚固化的 Telnet 配置立即生效，免去整机重启。当前 Telnet 会话会短暂中断，稍后重连即可。
+    cmd killall telnetd
+
+group 权限与账号修改
+  action 普通用户提权为管理员 | danger | 把 user 账号提升为管理员权限，登录后直接进超级用户页面。这会降低设备的管理隔离性。
+    cmd sendcmd 1 DB set DevAuthInfo 1 Level 1
+    cmd sendcmd 1 DB save
+  action 普通用户降权（恢复） | danger | 把 user 账号恢复为普通用户权限。
+    cmd sendcmd 1 DB set DevAuthInfo 1 Level 2
+    cmd sendcmd 1 DB save
+
+group PON 认证与设备标识
+  action 查看全部系统参数
+    cmd setmac show2
+  action 恢复双模切换可选 | danger | 恢复上行模式（10G-EPON / XGPON）在 Web 界面上的可切换性。
+    cmd setmac 3 40962
+
+group ITMS 注册
+  action 查看 ITMS 注册状态
+    cmd sendcmd 1 DB p PDTCTUSERINFO
+  action 劫持 ITMS 注册（显示为已注册） | danger | 换光猫后若上网正常但仍弹注册页面，用这个骗过 ITMS 检查。仅影响本地注册状态显示，不改变运营商侧的认证。
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 Status 0
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 Result 1
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 tForcePushFlg 0
+    cmd sendcmd 1 DB save
+
+group 限制解除
+  action 查看用户数限制
+    cmd sendcmd 1 DB p CltLmt
+  action 查看连接数限制
+    cmd sendcmd 1 DB p FWBase
+  action 解除用户数限制 | danger | 把最大用户数改到 255 并关闭限制检查。
+    cmd sendcmd 1 DB set CltLmt 8 Max 255
+    cmd sendcmd 1 DB set CltLmt 8 Enable 0
+    cmd sendcmd 1 DB save
+  action 解除连接数限制 | danger | 把最大连接数从默认 4000 提到 65535 并禁用限制。大量 P2P/多设备场景才有必要，改动后可回退。
+    cmd sendcmd 1 DB set FWBase 0 FwConnMaxEnable 0
+    cmd sendcmd 1 DB set FWBase 0 FwConntrackMax 65535
+    cmd sendcmd 1 DB set FWBase 0 ConntrackMax 65535
+    cmd sendcmd 1 DB save
+  action 关闭防火墙 | danger | 【安全风险】会关掉设备的防火墙等级限制。仅在排查连接问题时临时使用，用完建议恢复。
+    cmd sendcmd 1 DB set FWLevel 0 Level 0
+    cmd sendcmd 1 DB save
+  action 解除 LAN 端口绑定灰色 | danger | 让 Web 界面上的 LAN 端口绑定选项可以取消勾选。
+    cmd sendcmd 1 DB set LAND 0 LanBindEnable 0
+    cmd sendcmd 1 DB save
+
+group 远程管理 TR069
+  action 查看 TR069 状态
+    cmd sendcmd 1 DB p MgtServer
+  action 关闭 TR069 | danger | 关闭 TR069 远程管理开关。
+    cmd sendcmd 1 DB set MgtServer 0 Tr069Enable 0
+    cmd sendcmd 1 DB save
+  action 开启 TR069 | danger | 重新打开 TR069 远程管理开关。
+    cmd sendcmd 1 DB set MgtServer 0 Tr069Enable 1
+    cmd sendcmd 1 DB save
+  action 彻底切断 TR069 上报 | danger | 把服务器 URL 改成本机回环、关闭注册上报与周期上报。比单关 Tr069Enable 更彻底，但会让运营商无法远程下发配置，出故障时也无法远程修复。
+    cmd sendcmd 1 DB set MgtServer 0 URL http://127.0.0.1
+    cmd sendcmd 1 DB set MgtServer 0 Tr069Enable 0
+    cmd sendcmd 1 DB set MgtServer 0 PeriodicInformEnable 0
+    cmd sendcmd 1 DB save
+
+group 换机向导（按顺序执行）
+  action ① 记录原机参数（务必先做）
+    cmd setmac show2
+    cmd sendcmd 1 DB p DevInfo
+    cmd upgradetest getver
+    cmd cat /proc/capability/boardinfo
+  action ② 记录原机 WAN 与 VLAN
+    cmd sendcmd 1 DB p WANC
+    cmd sendcmd 1 DB p MgtServer
+  action ③ 记录原机账号表
+    cmd sendcmd 1 DB p DevAuthInfo
+  action ④ 写入 SN | danger | 会改变设备标识。仅当你已用①记录下原机 SN 时才继续，否则将无法恢复。
+    param SN前四位 | sn4 | 原机的 SN 前四位
+    param SN后八位 | sn8 | 原机的 SN 后八位
+    cmd setmac 1 2176 $SN前四位
+    cmd setmac 1 2177 $SN后八位
+  action ⑤ 写入 PON MAC | danger | 会改变设备标识。仅当你已用①记录下原机 MAC 时才继续。
+    param 原机PONMAC | mac | 原机的 PON MAC 地址
+    cmd setmac 1 32769 $原机PONMAC
+  action ⑥ 写入 LOID 宽带识别码 | danger | 填错会导致无法注册上线。请填写运营商提供的 LOID。
+    param LOID | text | 运营商提供的宽带识别码
+    cmd setmac 1 2180 $LOID
+  action ⑦ 劫持 ITMS 注册（防弹注册页） | danger | 换机后若上网正常但仍弹注册页面，执行这一条。仅影响本地注册状态显示。
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 Status 0
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 Result 1
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 tForcePushFlg 0
+  action ⑧ 切断 TR069 远程管理 | danger | 让运营商无法远程下发配置。若日后需要远程报修，记得先用「开启 TR069」恢复。
+    cmd sendcmd 1 DB set MgtServer 0 URL http://127.0.0.1
+    cmd sendcmd 1 DB set MgtServer 0 Tr069Enable 0
+    cmd sendcmd 1 DB set MgtServer 0 PeriodicInformEnable 0
+  action ⑨ 保存全部配置 | danger | 前面所有修改都必须保存，否则重启后丢失。
+    cmd sendcmd 1 DB save
+  action ⑩ 重启光猫生效 | danger | 重启后 Telnet 会断开，约 1-2 分钟后重新连接。若之后连不上 Telnet，说明新机没有固化 Telnet，需要重新开。
+    cmd reboot
+
+group 参数化修改（填表后执行）
+  action 修改超级管理员账号 | danger | 改的是 Web 管理页的登录账号。改完请记牢，忘了只能恢复出厂。
+    param 新账号 | text | 例如 telecomadmin
+    cmd sendcmd 1 DB set DevAuthInfo 0 User $新账号
+    cmd sendcmd 1 DB save
+  action 修改超级管理员密码 | danger | 改的是 Web 管理页的登录密码。改完请记牢，忘了只能恢复出厂。至少 8 位。
+    param 新密码 | password | 至少 8 位
+    cmd sendcmd 1 DB set DevAuthInfo 0 Pass $新密码
+    cmd sendcmd 1 DB save
+  action 修改普通用户密码 | danger | 改的是普通用户（user）的登录密码。至少 8 位。
+    param 新密码 | password | 至少 8 位
+    cmd sendcmd 1 DB set DevAuthInfo 1 Pass $新密码
+    cmd sendcmd 1 DB save
+  action 修改 PON MAC | danger | 会改变设备标识，运营商侧可能认定为非原机而断网或拉黑。改前务必记录原值。
+    param 新MAC | mac | 例如 aa:bb:cc:dd:ee:ff
+    cmd setmac 1 32769 $新MAC
+  action 修改 SN | danger | 会改变设备标识，运营商侧可能认定为非原机而断网或拉黑。SN 字母建议大写。
+    param SN前四位 | sn4 | 4 位，例如 ZTEG
+    param SN后八位 | sn8 | 8 位，例如 12345678
+    cmd setmac 1 2176 $SN前四位
+    cmd setmac 1 2177 $SN后八位
+  action 修改最大用户数 | danger | 把客户端数量上限改到指定值（建议不超过 255）并关闭限制检查。
+    param 最大用户数 | number | 建议 255
+    cmd sendcmd 1 DB set CltLmt 8 Max $最大用户数
+    cmd sendcmd 1 DB set CltLmt 8 Enable 0
+    cmd sendcmd 1 DB save
+  action 修改 LOID 宽带识别码 | danger | LOID 是运营商侧的认证凭据。填错会导致无法注册上线，请先记录原值。
+    param LOID | text | 运营商提供的宽带识别码
+    cmd setmac 1 2180 $LOID
+  action 修改 TR069 服务器地址 | danger | 改成无效地址可阻断远程管理。填 http://127.0.0.1 即指向本机。
+    param 服务器地址 | text | 例如 http://127.0.0.1
+    cmd sendcmd 1 DB set MgtServer 0 URL $服务器地址
+    cmd sendcmd 1 DB save
+
+group 区域与时间
+  action 查看区域代码表
+    cmd cat /etc/init.d/regioncode
+  action 查看当前区域
+    cmd cat /userconfig/flag_type
+  action 校时（自动换算北京时间 UTC-8） | danger | 光猫用的是 UTC 时间。这里已自动按北京时间减 8 小时换算，直接点即可，不需要自己心算。
+    cmd __SET_TIME_NOW__
+  action 修改区域码 | critical | 会立即重启；配置重置为该省默认模板（超密回默认、WAN 需重建、Telnet 必掉）；必须重新注册。这是刷机级操作，不是改设置。
+    param 目标区域码 | region | 三位数字，先点「查看区域代码表」确认
+    cmd upgradetest sdefconf $目标区域码
+
+group 系统
+  action 保存所有配置
+    cmd sendcmd 1 DB save
+  action 重启光猫 | danger | 重启期间 Telnet 会断开，需要稍后重新连接。
+    cmd reboot

@@ -1,0 +1,164 @@
+# 中兴光猫控制面板 —— F650 系列专用命令清单
+#
+# 文件名带 _f650 后缀，由程序在识别到 F650 系列机型时自动加载。
+# 机型判定依据见 src/model.rs（优先看 CPU 的 Hardware 行）。
+#
+# 本清单的命令全部基于 2017 版 F650（SoC ZX279127，软件 V2.0.0P1T1）
+# 的**真实回显**核对过。与 G7615 的差异主要有：
+#   - 没有 upgradetest getver（返回 function not found）
+#   - 没有 /proc/capability/boardinfo（文件不存在）
+#   - WiFi 密码在 WLANPSK 表，不在 WLANCfg
+#   - 无线参数在 WLANBase 表
+#
+# 格式说明见 命令预设.txt 顶部注释。
+
+group 状态查看
+  action 设备信息
+    cmd sendcmd 1 DB p DevInfo
+  action 系统版本
+    cmd cat /proc/version
+  action CPU 信息
+    cmd cat /proc/cpuinfo
+  action 内存占用
+    cmd cat /proc/meminfo
+  action 运行时长/负载
+    cmd uptime
+  action 在线/联网设备
+    cmd cat /proc/net/arp
+  action 系统时间
+    cmd date
+  action 区域代码表
+    cmd cat /etc/init.d/regioncode
+  action 当前区域
+    cmd cat /userconfig/flag_type
+
+group 账号与权限
+  action 查看账号表
+    cmd sendcmd 1 DB p DevAuthInfo
+  action 修改超级管理员账号 | danger | 改的是 Web 管理页的登录账号。改完请记牢，忘了只能恢复出厂。
+    param 新账号 | text | 例如 telecomadmin
+    cmd sendcmd 1 DB set DevAuthInfo 0 User $新账号
+    cmd sendcmd 1 DB save
+  action 修改超级管理员密码 | danger | 改的是 Web 管理页的登录密码。至少 8 位，改完请记牢。
+    param 新密码 | password | 至少 8 位
+    cmd sendcmd 1 DB set DevAuthInfo 0 Pass $新密码
+    cmd sendcmd 1 DB save
+  action 修改普通用户密码 | danger | 改的是普通用户（useradmin）的登录密码。至少 8 位。
+    param 新密码 | password | 至少 8 位
+    cmd sendcmd 1 DB set DevAuthInfo 1 Pass $新密码
+    cmd sendcmd 1 DB save
+  action 普通用户提权为管理员 | danger | 把普通用户提升为管理员权限（Level 1）。会降低设备的管理隔离性。
+    cmd sendcmd 1 DB set DevAuthInfo 1 Level 1
+    cmd sendcmd 1 DB save
+
+group WiFi 配置
+  action 查看 WiFi 基本配置
+    cmd sendcmd 1 DB p WLANCfg
+  action 查看无线射频参数
+    cmd sendcmd 1 DB p WLANBase
+  action 查看 WiFi 密码表
+    cmd sendcmd 1 DB p WLANPSK
+  action 修改 2.4G SSID 名称 | danger | 改的是第一路 WiFi 的广播名称。改完设备会短暂断连。
+    param 新SSID | text | 例如 MyHome-2G
+    cmd sendcmd 1 DB set WLANCfg 0 ESSID $新SSID
+    cmd sendcmd 1 DB save
+  action 修改 5G SSID 名称 | danger | 改的是第二路 WiFi 的广播名称。该路若未启用则无影响。
+    param 新SSID | text | 例如 MyHome-5G
+    cmd sendcmd 1 DB set WLANCfg 1 ESSID $新SSID
+    cmd sendcmd 1 DB save
+  action 隐藏第一路 WiFi 广播 | danger | 隐藏后需手动输入 SSID 才能连接。若把自己锁在外面，可用网线登录改回。
+    cmd sendcmd 1 DB set WLANCfg 0 ESSIDHideEnable 1
+    cmd sendcmd 1 DB save
+  action 显示第一路 WiFi 广播 | danger | 恢复广播 SSID。
+    cmd sendcmd 1 DB set WLANCfg 0 ESSIDHideEnable 0
+    cmd sendcmd 1 DB save
+  action 启用第一路 WiFi | danger | 打开第一路无线信号。
+    cmd sendcmd 1 DB set WLANCfg 0 Enable 1
+    cmd sendcmd 1 DB save
+  action 关闭第一路 WiFi | danger | 关闭第一路无线信号。若你正用 WiFi 连接，会在执行后断连。
+    cmd sendcmd 1 DB set WLANCfg 0 Enable 0
+    cmd sendcmd 1 DB save
+  action 清除 SSID 前缀 | danger | 运营商常给 SSID 加固定前缀。清空后 SSID 就是纯名称。
+    cmd sendcmd 1 DB set WLANCfg 0 ESSIDPrefix
+    cmd sendcmd 1 DB set WLANCfg 1 ESSIDPrefix
+    cmd sendcmd 1 DB save
+  action 修改第一路 WiFi 密码 | danger | 改的是 WLANPSK 表第 0 行。改完所有已连接设备会断开，需要用新密码重连。实测本机型会遮蔽该字段的回读值，所以无法自动校验，界面会标 ⚠ 提示你手动确认。
+    param 新密码 | password | 至少 8 位（WPA2 要求）
+    cmd sendcmd 1 DB set WLANPSK 0 KeyPassphrase $新密码
+    cmd sendcmd 1 DB save
+  action 修改第二路 WiFi 密码 | danger | 改的是 WLANPSK 表第 1 行。该路若未启用则无影响。
+    param 新密码 | password | 至少 8 位（WPA2 要求）
+    cmd sendcmd 1 DB set WLANPSK 1 KeyPassphrase $新密码
+    cmd sendcmd 1 DB save
+  action 修改第三路 WiFi 密码 | danger | 改的是 WLANPSK 表第 2 行。该路若未启用则无影响。
+    param 新密码 | password | 至少 8 位（WPA2 要求）
+    cmd sendcmd 1 DB set WLANPSK 2 KeyPassphrase $新密码
+    cmd sendcmd 1 DB save
+  action 修改第四路 WiFi 密码 | danger | 改的是 WLANPSK 表第 3 行。该路若未启用则无影响。
+    param 新密码 | password | 至少 8 位（WPA2 要求）
+    cmd sendcmd 1 DB set WLANPSK 3 KeyPassphrase $新密码
+    cmd sendcmd 1 DB save
+
+group 限制解除
+  action 查看用户数限制
+    cmd sendcmd 1 DB p CltLmt
+  action 查看连接数限制
+    cmd sendcmd 1 DB p FWBase
+  action 查看防火墙等级
+    cmd sendcmd 1 DB p FWLevel
+  action 解除用户数限制 | danger | 把第 9 路限制（Type 8，通常是总用户数）改到指定值并关闭检查。
+    param 最大用户数 | number | 建议 255
+    cmd sendcmd 1 DB set CltLmt 8 Max $最大用户数
+    cmd sendcmd 1 DB set CltLmt 8 Enable 0
+    cmd sendcmd 1 DB save
+  action 解除连接数限制 | danger | 把最大连接数提到 65535 并禁用限制。大量 P2P/多设备场景才有必要。
+    cmd sendcmd 1 DB set FWBase 0 FwConnMaxEnable 0
+    cmd sendcmd 1 DB set FWBase 0 FwConntrackMax 65535
+    cmd sendcmd 1 DB set FWBase 0 ConntrackMax 65535
+    cmd sendcmd 1 DB save
+  action 关闭防火墙 | danger | 【安全风险】会关掉设备的防火墙等级限制。仅在排查连接问题时临时使用，用完建议恢复。
+    cmd sendcmd 1 DB set FWLevel 0 Level 0
+    cmd sendcmd 1 DB save
+  action 解除 LAN 端口绑定灰色 | danger | 让 Web 界面上的 LAN 端口绑定选项可以取消勾选。
+    cmd sendcmd 1 DB set LAND 0 LanBindEnable 0
+    cmd sendcmd 1 DB save
+
+group ITMS 与远程管理
+  action 查看 ITMS 注册状态
+    cmd sendcmd 1 DB p PDTCTUSERINFO
+  action 查看 TR069 状态
+    cmd sendcmd 1 DB p MgtServer
+  action 劫持 ITMS 注册（显示为已注册） | danger | 换光猫后若上网正常但仍弹注册页面，用这个骗过 ITMS 检查。仅影响本地注册状态显示。
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 Status 0
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 Result 1
+    cmd sendcmd 1 DB set PDTCTUSERINFO 0 tForcePushFlg 0
+    cmd sendcmd 1 DB save
+  action 关闭 TR069 | danger | 关闭 TR069 远程管理开关。
+    cmd sendcmd 1 DB set MgtServer 0 Tr069Enable 0
+    cmd sendcmd 1 DB save
+  action 彻底切断 TR069 上报 | danger | 把服务器 URL 改成本机回环、关闭注册上报与周期上报。会让运营商无法远程下发配置，出故障时也无法远程修复。
+    cmd sendcmd 1 DB set MgtServer 0 URL http://127.0.0.1
+    cmd sendcmd 1 DB set MgtServer 0 Tr069Enable 0
+    cmd sendcmd 1 DB set MgtServer 0 PeriodicInformEnable 0
+    cmd sendcmd 1 DB save
+
+group Telnet
+  action 查看 Telnet 配置
+    cmd sendcmd 1 DB p TelnetCfg
+  action 固化 Telnet | danger | 会写入指定的账号密码并延长关闭时间。仅在局域网内使用，建议设强口令。
+    param Telnet账号 | text | 例如 root
+    param Telnet密码 | password | 至少 8 位
+    cmd sendcmd 1 DB set TelnetCfg 0 Lan_Enable 1
+    cmd sendcmd 1 DB set TelnetCfg 0 Lan_EnableAfterOlt 1
+    cmd sendcmd 1 DB set TelnetCfg 0 CloseServerTime 9999999
+    cmd sendcmd 1 DB set TelnetCfg 0 TS_UName $Telnet账号
+    cmd sendcmd 1 DB set TelnetCfg 0 TSLan_UName $Telnet账号
+    cmd sendcmd 1 DB set TelnetCfg 0 TS_UPwd $Telnet密码
+    cmd sendcmd 1 DB set TelnetCfg 0 TSLan_UPwd $Telnet密码
+    cmd sendcmd 1 DB save
+
+group 系统
+  action 保存所有配置
+    cmd sendcmd 1 DB save
+  action 重启光猫 | danger | 重启期间 Telnet 会断开，需要稍后重新连接。
+    cmd reboot

@@ -1,0 +1,26 @@
+[package]
+name = "zte_g7615_panel"
+version = "1.1.0"
+edition = "2021"
+description = "中兴光猫 Telnet 图形控制面板（自动识别机型）"
+authors = ["qinzuoyong"]
+license = "MIT"
+build = "build.rs"
+
+[dependencies]
+# 只用 glow(OpenGL) 后端，不要默认的 wgpu：
+# 本机实测 wgpu 的默认初始化路径会在启动时耗尽主线程栈，
+# 表现为一启动就 `thread 'main' has overflowed its stack`（0xC0000005）。
+# glow 后端轻量得多，初始化不会爆栈，且桌面端足够用。
+eframe = { version = "0.36", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "wayland",
+    "x11",
+] }
+
+[profile.release]
+opt-level = 2
+strip = true
+lto = false
+
